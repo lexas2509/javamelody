@@ -44,6 +44,7 @@ class HtmlCounterReport extends HtmlAbstractReport {
 	private final HtmlCounterRequestGraphReport htmlCounterRequestGraphReport;
 	private final DecimalFormat systemErrorFormat = I18N.createPercentFormat();
 	private final DecimalFormat integerFormat = I18N.createIntegerFormat();
+	private final DecimalFormat floatFormat = I18N.createFloatFormat();
 
 	static class HtmlCounterRequestGraphReport extends HtmlAbstractReport {
 		private static final String SCRIPT_BEGIN = "<script type='text/javascript'>";
@@ -751,7 +752,7 @@ class HtmlCounterReport extends HtmlAbstractReport {
 		if (diviseur == 0) {
 			write("0");
 		} else {
-			write(integerFormat.format(100 * dividende / diviseur));
+			write(floatFormat.format(100.0 * dividende / diviseur));
 		}
 	}
 

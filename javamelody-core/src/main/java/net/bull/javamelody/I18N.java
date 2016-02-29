@@ -211,6 +211,10 @@ final class I18N {
 		return new DecimalFormat("0.00", getDecimalFormatSymbols());
 	}
 
+	static DecimalFormat createFloatFormat() {
+		return new DecimalFormat("0.0000", getDecimalFormatSymbols());
+	}
+
 	private static DecimalFormatSymbols getDecimalFormatSymbols() {
 		// optimisation mémoire (si Java 1.6)
 		return DecimalFormatSymbols.getInstance(getCurrentLocale());
