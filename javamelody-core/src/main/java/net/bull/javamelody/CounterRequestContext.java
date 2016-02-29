@@ -40,7 +40,7 @@ class CounterRequestContext implements ICounterRequestContext, Cloneable, Serial
 	private Counter parentCounter;
 	private final CounterRequestContext parentContext;
 	private CounterRequestContext currentChildContext;
-	private final String requestName;
+	private String requestName;
 	private final String completeRequestName;
 	private final String remoteUser;
 	private final long threadId;
@@ -314,5 +314,9 @@ class CounterRequestContext implements ICounterRequestContext, Cloneable, Serial
 				+ getThreadId() + ", startTime=" + startTime + ", childHits=" + getChildHits()
 				+ ", childDurationsSum=" + getChildDurationsSum() + ", childContexts="
 				+ getChildContexts() + ']';
+	}
+
+	public void setRequestName(String requestName) {
+		this.requestName = requestName;
 	}
 }
