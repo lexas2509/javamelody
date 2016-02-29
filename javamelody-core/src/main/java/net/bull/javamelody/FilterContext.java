@@ -22,78 +22,77 @@ import java.security.CodeSource;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
  * Contexte du filtre http pour initialisation et destruction.
+ *
  * @author Emeric Vernat
  */
 class FilterContext {
-	private static final boolean MOJARRA_AVAILABLE = isMojarraAvailable();
+    private static final boolean MOJARRA_AVAILABLE = isMojarraAvailable();
 
 	private final Collector collector;
 	private final Timer timer;
 	private final SamplingProfiler samplingProfiler;
 	private final TimerTask collectTimerTask;
 
-	private static final class CollectTimerTask extends TimerTask {
-		private final Collector collector;
+    private static final class CollectTimerTask extends TimerTask {
+        private final Collector collector;
 
-		CollectTimerTask(Collector collector) {
-			super();
-			this.collector = collector;
-		}
+        CollectTimerTask(Collector collector) {
+            super();
+            this.collector = collector;
+        }
 
-		/** {@inheritDoc} */
-		@Override
-		public void run() {
-			// il ne doit pas y avoir d'erreur dans cette task
-			collector.collectLocalContextWithoutErrors();
-		}
-	}
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void run() {
+            // il ne doit pas y avoir d'erreur dans cette task
+            collector.collectLocalContextWithoutErrors();
+        }
+    }
 
-	FilterContext() {
-		super();
+    FilterContext() {
+        super();
 
-		boolean initOk = false;
-		this.timer = new Timer("javamelody"
-				+ Parameters.getContextPath(Parameters.getServletContext()).replace('/', ' '), true);
-		try {
-			logSystemInformationsAndParameters();
+        boolean initOk = false;
+        this.timer = new Timer("javamelody"
+                + Parameters.getContextPath(Parameters.getServletContext()).replace('/', ' '), true);
+        try {
+            logSystemInformationsAndParameters();
 
-			initLogs();
+            initLogs();
 
-			if (Boolean.parseBoolean(Parameters.getParameter(Parameter.CONTEXT_FACTORY_ENABLED))) {
-				MonitoringInitialContextFactory.init();
-			}
+            if (Boolean.parseBoolean(Parameters.getParameter(Parameter.CONTEXT_FACTORY_ENABLED))) {
+                MonitoringInitialContextFactory.init();
+            }
 
-			// si l'application a utilisé JdbcDriver avant d'initialiser ce filtre
-			// (par exemple dans un listener de contexte), on doit récupérer son sqlCounter
-			// car il est lié à une connexion jdbc qui est certainement conservée dans un pool
-			// (sinon les requêtes sql sur cette connexion ne seront pas monitorées)
-			// sqlCounter dans JdbcWrapper peut être alimenté soit par une datasource soit par un driver
-			JdbcWrapper.SINGLETON.initServletContext(Parameters.getServletContext());
-			if (!Parameters.isNoDatabase()) {
-				JdbcWrapper.SINGLETON.rebindDataSources();
-			} else {
-				// si le paramètre no-database a été mis dans web.xml, des datasources jndi ont pu
-				// être rebindées auparavant par SessionListener, donc on annule ce rebinding
-				JdbcWrapper.SINGLETON.stop();
-			}
+            // si l'application a utilisé JdbcDriver avant d'initialiser ce filtre
+            // (par exemple dans un listener de contexte), on doit récupérer son sqlCounter
+            // car il est lié à une connexion jdbc qui est certainement conservée dans un pool
+            // (sinon les requêtes sql sur cette connexion ne seront pas monitorées)
+            // sqlCounter dans JdbcWrapper peut être alimenté soit par une datasource soit par un driver
+            JdbcWrapper.SINGLETON.initServletContext(Parameters.getServletContext());
+            if (!Parameters.isNoDatabase()) {
+                JdbcWrapper.SINGLETON.rebindDataSources();
+            } else {
+                // si le paramètre no-database a été mis dans web.xml, des datasources jndi ont pu
+                // être rebindées auparavant par SessionListener, donc on annule ce rebinding
+                JdbcWrapper.SINGLETON.stop();
+            }
 
-			// initialisation du listener de jobs quartz
-			if (JobInformations.QUARTZ_AVAILABLE) {
-				JobGlobalListener.initJobGlobalListener();
-			}
+            // initialisation du listener de jobs quartz
+            if (JobInformations.QUARTZ_AVAILABLE) {
+                JobGlobalListener.initJobGlobalListener();
+            }
 
-			if (MOJARRA_AVAILABLE) {
-				JsfActionHelper.initJsfActionListener();
-			}
+            if (MOJARRA_AVAILABLE) {
+                JsfActionHelper.initJsfActionListener();
+            }
 
 			this.samplingProfiler = initSamplingProfiler();
 
@@ -102,25 +101,25 @@ class FilterContext {
 			this.collector = new Collector(application, counters, this.samplingProfiler);
 			this.collectTimerTask = new CollectTimerTask(collector);
 
-			initCollect();
+            initCollect();
 
-			initOk = true;
-		} finally {
-			if (!initOk) {
-				// si exception dans initialisation, on annule la création du timer
-				// (sinon tomcat ne serait pas content)
-				timer.cancel();
-				LOG.debug("JavaMelody init failed");
-			}
-		}
-	}
+            initOk = true;
+        } finally {
+            if (!initOk) {
+                // si exception dans initialisation, on annule la création du timer
+                // (sinon tomcat ne serait pas content)
+                timer.cancel();
+                LOG.debug("JavaMelody init failed");
+            }
+        }
+    }
 
-	private static List<Counter> initCounters() {
-		// liaison des compteurs : les contextes par thread du sqlCounter ont pour parent le httpCounter
-		final Counter sqlCounter = JdbcWrapper.SINGLETON.getSqlCounter();
-		final Counter httpCounter = new Counter(Counter.HTTP_COUNTER_NAME, "dbweb.png", sqlCounter);
-		final Counter errorCounter = new Counter(Counter.ERROR_COUNTER_NAME, "error.png");
-		errorCounter.setMaxRequestsCount(250);
+    private List<Counter> initCounters() {
+        // liaison des compteurs : les contextes par thread du sqlCounter ont pour parent le httpCounter
+        final Counter sqlCounter = JdbcWrapper.SINGLETON.getSqlCounter();
+        final Counter httpCounter = new Counter(Counter.HTTP_COUNTER_NAME, "dbweb.png", sqlCounter);
+        final Counter errorCounter = new Counter(Counter.ERROR_COUNTER_NAME, "error.png");
+        errorCounter.setMaxRequestsCount(250);
 
 		final Counter jpaCounter = MonitoringProxy.getJpaCounter();
 		final Counter ejbCounter = MonitoringProxy.getEjbCounter();
@@ -131,17 +130,19 @@ class FilterContext {
 		final Counter jsfCounter = MonitoringProxy.getJsfCounter();
 		final Counter logCounter = LoggingHandler.getLogCounter();
 		final Counter jspCounter = JspWrapper.getJspCounter();
-		final List<Counter> counters;
+		final List<Counter> counters = new ArrayList<Counter>();
 		if (JobInformations.QUARTZ_AVAILABLE) {
 			final Counter jobCounter = JobGlobalListener.getJobCounter();
-			counters = Arrays.asList(httpCounter, sqlCounter, jpaCounter, ejbCounter,
+			counters.addAll(Arrays.asList(httpCounter, sqlCounter, jpaCounter, ejbCounter,
 					springCounter, guiceCounter, servicesCounter, strutsCounter, jsfCounter,
-					jspCounter, errorCounter, logCounter, jobCounter);
+					jspCounter, errorCounter, logCounter, jobCounter));
 		} else {
-			counters = Arrays.asList(httpCounter, sqlCounter, jpaCounter, ejbCounter,
-					springCounter, guiceCounter, servicesCounter, strutsCounter, jsfCounter,
-					jspCounter, errorCounter, logCounter);
+			counters.addAll(Arrays.asList(httpCounter, sqlCounter, jpaCounter, ejbCounter,
+                    springCounter, guiceCounter, servicesCounter, strutsCounter, jsfCounter,
+                    jspCounter, errorCounter, logCounter));
 		}
+
+        registerAdditionalCounters(counters);
 
 		setRequestTransformPatterns(counters);
 		final String displayedCounters = Parameters.getParameter(Parameter.DISPLAYED_COUNTERS);
@@ -166,20 +167,27 @@ class FilterContext {
 		return counters;
 	}
 
-	private static void setRequestTransformPatterns(List<Counter> counters) {
-		for (final Counter counter : counters) {
-			// le paramètre pour ce nom de compteur doit exister
-			final Parameter parameter = Parameter.valueOfIgnoreCase(counter.getName()
-					+ "_TRANSFORM_PATTERN");
-			if (Parameters.getParameter(parameter) != null) {
-				final Pattern pattern = Pattern.compile(Parameters.getParameter(parameter),
-						Pattern.MULTILINE | Pattern.DOTALL);
-				counter.setRequestTransformPattern(pattern);
-			}
-		}
-	}
+    private static void setRequestTransformPatterns(List<Counter> counters) {
+        for (final Counter counter : counters) {
+            // le paramètre pour ce nom de compteur doit exister
+            for (Parameter parameter : Parameter.values()) {
+                if (parameter.name().equalsIgnoreCase(counter.getName() + "_TRANSFORM_PATTERN")) {
+                    String value = Parameters.getParameter(parameter);
+                    if (value != null) {
+                        final Pattern pattern = Pattern.compile(value);
+                        counter.setRequestTransformPattern(pattern);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
-	private static void setDisplayedCounters(List<Counter> counters, String displayedCounters) {
+    protected void registerAdditionalCounters(List<Counter> counters) {
+    }
+
+
+    private static void setDisplayedCounters(List<Counter> counters, String displayedCounters) {
 		for (final Counter counter : counters) {
 			if (counter.isJobCounter()) {
 				// le compteur "job" a toujours displayed=true s'il est présent,
@@ -192,39 +200,42 @@ class FilterContext {
 		if (displayedCounters.length() != 0) {
 			for (final String displayedCounter : displayedCounters.split(",")) {
 				final String displayedCounterName = displayedCounter.trim();
-				boolean found = false;
-				for (final Counter counter : counters) {
-					if (displayedCounterName.equalsIgnoreCase(counter.getName())) {
-						counter.setDisplayed(true);
-						found = true;
+
+				Counter found = null;
+				for (Counter counter : counters) {
+					if (counter.getName().equalsIgnoreCase(displayedCounterName)) {
+						found = counter;
 						break;
 					}
 				}
-				if (!found) {
+
+				if (found == null) {
 					throw new IllegalArgumentException("Unknown counter: " + displayedCounterName);
+				} else {
+					found.setDisplayed(true);
 				}
 			}
 		}
 	}
 
-	private void initCollect() {
-		try {
-			Class.forName("org.jrobin.core.RrdDb");
-			// il a parfois été observé "ClassNotFoundException: org.jrobin.core.RrdException"
-			// dans tomcat lors de l'arrêt du serveur à l'appel de JRobin.stop()
-			Class.forName("org.jrobin.core.RrdException");
-		} catch (final ClassNotFoundException e) {
-			LOG.debug("jrobin classes unavailable: collect of data is disabled");
+    private void initCollect() {
+        try {
+            Class.forName("org.jrobin.core.RrdDb");
+            // il a parfois été observé "ClassNotFoundException: org.jrobin.core.RrdException"
+            // dans tomcat lors de l'arrêt du serveur à l'appel de JRobin.stop()
+            Class.forName("org.jrobin.core.RrdException");
+        } catch (final ClassNotFoundException e) {
+            LOG.debug("jrobin classes unavailable: collect of data is disabled");
 			HttpCookieManager.setDefaultRange(Period.TOUT.getRange());
 			// si pas de jar jrobin, alors pas de collecte et période "Tout" par défaut
-			return;
-		}
+            return;
+        }
 
 		try {
 			JRobin.initBackendFactory(timer);
 		} catch (final IOException e) {
 			LOG.warn(e.toString(), e);
-		}
+				}
 		final int resolutionSeconds = Parameters.getResolutionSeconds();
 		final int periodMillis = resolutionSeconds * 1000;
 		// on schedule la tâche de fond
@@ -236,13 +247,13 @@ class FilterContext {
 		collector.collectLocalContextWithoutErrors();
 		LOG.debug("first collect of data done");
 
-		if (Parameters.getParameter(Parameter.MAIL_SESSION) != null
-				&& Parameters.getParameter(Parameter.ADMIN_EMAILS) != null) {
-			MailReport.scheduleReportMailForLocalServer(collector, timer);
-			LOG.debug("mail reports scheduled for "
-					+ Parameters.getParameter(Parameter.ADMIN_EMAILS));
-		}
-	}
+        if (Parameters.getParameter(Parameter.MAIL_SESSION) != null
+                && Parameters.getParameter(Parameter.ADMIN_EMAILS) != null) {
+            MailReport.scheduleReportMailForLocalServer(collector, timer);
+            LOG.debug("mail reports scheduled for "
+                    + Parameters.getParameter(Parameter.ADMIN_EMAILS));
+        }
+    }
 
 	private SamplingProfiler initSamplingProfiler() {
 		if (Parameters.getParameter(Parameter.SAMPLING_SECONDS) != null) {
@@ -272,53 +283,53 @@ class FilterContext {
 		return null;
 	}
 
-	private static void initLogs() {
-		// on branche le handler java.util.logging pour le counter de logs
-		LoggingHandler.getSingleton().register();
+    private static void initLogs() {
+        // on branche le handler java.util.logging pour le counter de logs
+        LoggingHandler.getSingleton().register();
 
-		if (LOG.LOG4J_ENABLED) {
-			// si log4j est disponible on branche aussi l'appender pour le counter de logs
-			Log4JAppender.getSingleton().register();
-		}
+        if (LOG.LOG4J_ENABLED) {
+            // si log4j est disponible on branche aussi l'appender pour le counter de logs
+            Log4JAppender.getSingleton().register();
+        }
 
 		if (LOG.LOGBACK_ENABLED) {
 			// si logback est disponible on branche aussi l'appender pour le counter de logs
 			LogbackAppender.getSingleton().register();
-		}
+			}
 		LOG.debug("log listeners initialized");
 	}
 
-	private static boolean isMojarraAvailable() {
-		try {
-			Class.forName("com.sun.faces.application.ActionListenerImpl");
-			return true;
-		} catch (final Throwable e) { // NOPMD
-			return false;
-		}
-	}
+    private static boolean isMojarraAvailable() {
+        try {
+            Class.forName("com.sun.faces.application.ActionListenerImpl");
+            return true;
+        } catch (final Throwable e) { // NOPMD
+            return false;
+        }
+    }
 
-	private static void logSystemInformationsAndParameters() {
-		// log les principales informations sur le système et sur les paramètres définis spécifiquement
-		LOG.debug("OS: " + System.getProperty("os.name") + ' '
-				+ System.getProperty("sun.os.patch.level") + ", " + System.getProperty("os.arch")
-				+ '/' + System.getProperty("sun.arch.data.model"));
-		LOG.debug("Java: " + System.getProperty("java.runtime.name") + ", "
-				+ System.getProperty("java.runtime.version"));
-		LOG.debug("Server: " + Parameters.getServletContext().getServerInfo());
-		LOG.debug("Webapp context: " + Parameters.getContextPath(Parameters.getServletContext()));
-		LOG.debug("JavaMelody version: " + Parameters.JAVAMELODY_VERSION);
+    private static void logSystemInformationsAndParameters() {
+        // log les principales informations sur le système et sur les paramètres définis spécifiquement
+        LOG.debug("OS: " + System.getProperty("os.name") + ' '
+                + System.getProperty("sun.os.patch.level") + ", " + System.getProperty("os.arch")
+                + '/' + System.getProperty("sun.arch.data.model"));
+        LOG.debug("Java: " + System.getProperty("java.runtime.name") + ", "
+                + System.getProperty("java.runtime.version"));
+        LOG.debug("Server: " + Parameters.getServletContext().getServerInfo());
+        LOG.debug("Webapp context: " + Parameters.getContextPath(Parameters.getServletContext()));
+        LOG.debug("JavaMelody version: " + Parameters.JAVAMELODY_VERSION);
 		final String location = getJavaMelodyLocation();
 		if (location != null) {
 			LOG.debug("JavaMelody classes loaded from: " + location);
 		}
-		LOG.debug("Host: " + Parameters.getHostName() + '@' + Parameters.getHostAddress());
-		for (final Parameter parameter : Parameter.values()) {
-			final String value = Parameters.getParameter(parameter);
+        LOG.debug("Host: " + Parameters.getHostName() + '@' + Parameters.getHostAddress());
+        for (final Parameter parameter : Parameter.values()) {
+            final String value = Parameters.getParameter(parameter);
 			if (value != null && parameter != Parameter.ANALYTICS_ID) {
-				LOG.debug("parameter defined: " + parameter.getCode() + '=' + value);
-			}
-		}
-	}
+                LOG.debug("parameter defined: " + parameter.getCode() + '=' + value);
+            }
+        }
+    }
 
 	private static String getJavaMelodyLocation() {
 		final Class<FilterContext> clazz = FilterContext.class;
@@ -349,79 +360,79 @@ class FilterContext {
 		collector.stop();
 	}
 
-	void destroy() {
-		try {
-			try {
-				if (collector != null) {
-					new MonitoringController(collector, null).writeHtmlToLastShutdownFile();
-				}
-			} finally {
-				//on rebind les dataSources initiales à la place des proxy
-				JdbcWrapper.SINGLETON.stop();
+    void destroy() {
+        try {
+            try {
+                if (collector != null) {
+                    new MonitoringController(collector, null).writeHtmlToLastShutdownFile();
+                }
+            } finally {
+                //on rebind les dataSources initiales à la place des proxy
+                JdbcWrapper.SINGLETON.stop();
 
-				deregisterJdbcDriver();
+                deregisterJdbcDriver();
 
-				// on enlève l'appender de logback, log4j et le handler de java.util.logging
-				deregisterLogs();
+                // on enlève l'appender de logback, log4j et le handler de java.util.logging
+                deregisterLogs();
 
-				// on enlève le listener de jobs quartz
-				if (JobInformations.QUARTZ_AVAILABLE) {
-					JobGlobalListener.destroyJobGlobalListener();
-				}
-			}
-		} finally {
-			MonitoringInitialContextFactory.stop();
+                // on enlève le listener de jobs quartz
+                if (JobInformations.QUARTZ_AVAILABLE) {
+                    JobGlobalListener.destroyJobGlobalListener();
+                }
+            }
+        } finally {
+            MonitoringInitialContextFactory.stop();
 
-			// on arrête le thread du collector,
-			// on persiste les compteurs pour les relire à l'initialisation et ne pas perdre les stats
-			// et on vide les compteurs
-			if (timer != null) {
-				timer.cancel();
-			}
+            // on arrête le thread du collector,
+            // on persiste les compteurs pour les relire à l'initialisation et ne pas perdre les stats
+            // et on vide les compteurs
+            if (timer != null) {
+                timer.cancel();
+            }
 			if (samplingProfiler != null) {
 				samplingProfiler.clear();
 			}
-			if (collector != null) {
-				collector.stop();
-			}
-			Collector.stopJRobin();
-			Collector.detachVirtualMachine();
-		}
-	}
+            if (collector != null) {
+                collector.stop();
+            }
+            Collector.stopJRobin();
+            Collector.detachVirtualMachine();
+        }
+    }
 
-	private static void deregisterJdbcDriver() {
-		// on désinstalle le driver jdbc s'il est installé
-		// (mais sans charger la classe JdbcDriver pour ne pas installer le driver)
-		final Class<FilterContext> classe = FilterContext.class;
-		final String packageName = classe.getName().substring(0,
-				classe.getName().length() - classe.getSimpleName().length() - 1);
-		for (final Driver driver : Collections.list(DriverManager.getDrivers())) {
-			if (driver.getClass().getName().startsWith(packageName)) {
-				try {
-					DriverManager.deregisterDriver(driver);
-				} catch (final SQLException e) {
-					// ne peut arriver
-					throw new IllegalStateException(e);
-				}
-			}
-		}
-	}
+    private static void deregisterJdbcDriver() {
+        // on désinstalle le driver jdbc s'il est installé
+        // (mais sans charger la classe JdbcDriver pour ne pas installer le driver)
+        final Class<FilterContext> classe = FilterContext.class;
+        final String packageName = classe.getName().substring(0,
+                classe.getName().length() - classe.getSimpleName().length() - 1);
+        for (final Driver driver : Collections.list(DriverManager.getDrivers())) {
+            if (driver.getClass().getName().startsWith(packageName)) {
+                try {
+                    DriverManager.deregisterDriver(driver);
+                } catch (final SQLException e) {
+                    // ne peut arriver
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+    }
 
-	private static void deregisterLogs() {
-		if (LOG.LOGBACK_ENABLED) {
-			LogbackAppender.getSingleton().deregister();
-		}
-		if (LOG.LOG4J_ENABLED) {
-			Log4JAppender.getSingleton().deregister();
-		}
-		LoggingHandler.getSingleton().deregister();
-	}
+    private static void deregisterLogs() {
+        if (LOG.LOGBACK_ENABLED) {
+            LogbackAppender.getSingleton().deregister();
+        }
+        if (LOG.LOG4J_ENABLED) {
+            Log4JAppender.getSingleton().deregister();
+        }
+        LoggingHandler.getSingleton().deregister();
+    }
 
-	Collector getCollector() {
-		return collector;
-	}
+    Collector getCollector() {
+        return collector;
+    }
 
-	Timer getTimer() {
-		return timer;
-	}
+    Timer getTimer() {
+        return timer;
+    }
 }

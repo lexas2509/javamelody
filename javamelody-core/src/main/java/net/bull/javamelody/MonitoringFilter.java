@@ -109,7 +109,12 @@ public class MonitoringFilter implements Filter {
 
 		LOG.debug("JavaMelody filter init started");
 
-		this.filterContext = new FilterContext();
+		this.filterContext = new FilterContext() {
+			@Override
+			protected void registerAdditionalCounters(List<Counter> counters) {
+				MonitoringFilter.this.registerAdditionalCounters(counters);
+			}
+		};
 		this.httpAuth = new HttpAuth();
 		config.getServletContext().setAttribute(ReportServlet.FILTER_CONTEXT_KEY, filterContext);
 		final Collector collector = filterContext.getCollector();
@@ -125,6 +130,9 @@ public class MonitoringFilter implements Filter {
 
 		final long duration = System.currentTimeMillis() - start;
 		LOG.debug("JavaMelody filter init done in " + duration + " ms");
+	}
+
+	protected void registerAdditionalCounters(List<Counter> counters) {
 	}
 
 	/** {@inheritDoc} */
@@ -397,7 +405,7 @@ public class MonitoringFilter implements Filter {
 		return tmp + '?' + queryString + ' ' + method;
 	}
 
-	private boolean isRequestExcluded(HttpServletRequest httpRequest) {
+	protected boolean isRequestExcluded(HttpServletRequest httpRequest) {
 		return urlExcludePattern != null
 				&& urlExcludePattern.matcher(
 						httpRequest.getRequestURI()

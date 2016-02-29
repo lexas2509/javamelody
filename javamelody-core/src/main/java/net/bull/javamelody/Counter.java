@@ -916,6 +916,10 @@ class Counter implements Cloneable, Serializable { // NOPMD
 		}
 	}
 
+	public ThreadLocal<CounterRequestContext> getContextThreadLocal() {
+		return contextThreadLocal;
+	}
+
 	/** {@inheritDoc} */
 	@Override
 	public String toString() {
